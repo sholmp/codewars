@@ -50,7 +50,7 @@ public:
   }
   ShipType type() const { return type_; }
 
-  set<Point> boundary()
+  set<Point> boundary() const
   {
     static vector<Point> unitDirections = {{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 0}, {0, 1}, {1, -1}, {1, 0}, {1, 1}};
     set<Point> boundary;
@@ -150,6 +150,56 @@ map<ShipType, uint8_t> countShipTypes(const vector<Ship> &ships)
   return shipTypesCounter;
 }
 
+using battlefield = vector<vector<int>>;
+
+ostream &operator<<(ostream &os, const battlefield &rhs)
+{
+  os << "{";
+  for (const auto &row : rhs)
+  {
+    stringstream ss;
+    os << "{";
+    for (int e : row)
+    {
+      ss << e << ",";
+    }
+    string line(ss.str());
+    line.pop_back(); // remove trailing ','
+    os << line;
+    os << "}," << endl;
+  }
+  os << "}";
+  return os;
+}
+
+// Filters away points that are outside the field
+vector<Point> filteredShipBoundary(const Ship &ship, const battlefield &field)
+{
+  int N = field.size();
+  auto boundary = ship.boundary();
+  vector<Point> filteredBoundary; // Remove any point with x or y outside range [0,9]
+
+  auto insideBoundaries = [N](const Point &p)
+  {
+    return (p.x >= 0 && p.x < N) && (p.y >= 0 && p.y < N);
+  };
+
+  copy_if(boundary.begin(), boundary.end(), back_inserter(filteredBoundary), insideBoundaries);
+
+  return filteredBoundary;
+}
+
+bool shipBoundaryCollidesWithSomething(const Ship &ship, const battlefield &field)
+{
+  auto filteredBoundary = filteredShipBoundary(ship, field);
+  for (const auto &p : filteredBoundary)
+  {
+    if (field[p.x][p.y]) // the boundary touches something
+      return true;
+  }
+  return false;
+}
+
 bool validate_battlefield(std::vector<std::vector<int>> field)
 {
   // Write your magic here ;)
@@ -160,8 +210,114 @@ bool validate_battlefield(std::vector<std::vector<int>> field)
   if (!correctNumberOfShipsFound)
     return false;
 
-  return true;
+  bool collides = false;
+  for (const auto &ship : ships)
+  {
+    collides = collides || shipBoundaryCollidesWithSomething(ship, field);
+  }
+
+  return !collides;
 }
+
+class BattleshipTest : public ::testing::Test
+{
+protected:
+  void SetUp() override
+  {
+    field_ = {
+        std::vector<int>{1, 0, 0, 0, 0, 1, 1, 0, 0, 0},
+        std::vector<int>{1, 0, 1, 0, 0, 0, 0, 0, 1, 0},
+        std::vector<int>{1, 0, 1, 0, 1, 1, 1, 0, 1, 0},
+        std::vector<int>{1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        std::vector<int>{0, 0, 0, 0, 0, 0, 0, 0, 1, 0},
+        std::vector<int>{0, 0, 0, 0, 1, 1, 1, 0, 0, 0},
+        std::vector<int>{0, 0, 0, 0, 0, 0, 0, 0, 1, 0},
+        std::vector<int>{0, 0, 0, 1, 0, 0, 0, 0, 0, 0},
+        std::vector<int>{0, 0, 0, 0, 0, 0, 0, 1, 0, 0},
+        std::vector<int>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
+  }
+
+  battlefield field_;
+};
+
+// TEST_F(BattleshipTest, FilterBoundaryPoints)
+// {
+//   Ship ship(Point{0, 0}, Submarine, true);
+
+//   auto filteredBoundary = filteredShipBoundary(ship, field_);
+
+//   EXPECT_EQ(filteredBoundary.size(), 3);
+// }
+
+// TEST_F(BattleshipTest, CollisionDetectionTest)
+// {
+//   battlefield field = {{0, 1, 0, 0, 0, 0, 0, 0, 0, 0},
+//                        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//                        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//                        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//                        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//                        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//                        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//                        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//                        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//                        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
+
+//   cout << field;
+
+//   Ship ship(Point{0, 0}, Submarine, true);
+//   EXPECT_TRUE(shipBoundaryCollidesWithSomething(ship, field));
+// }
+
+// TEST(SaenkeSlagSkib, CorrectBoundaryPoints)
+// {
+//   set<Point> expectedBoundary = {{-1, -1}, {-1, 0}, {-1, 1}, {-1, 2}, {-1, 3}, {0, -1}, {0, 3}, {1, -1}, {1, 0}, {1, 1}, {1, 2}, {1, 3}};
+
+//   Ship ship(Point{0, 0}, Cruiser, true);
+//   set<Point> shipBoundary = ship.boundary();
+//   for (auto p : expectedBoundary)
+//   {
+//     cout << "{" << p.x << ", " << p.y << "}, ";
+//   }
+//   cout << endl;
+//   for (auto p : shipBoundary)
+//   {
+//     cout << "{" << p.x << ", " << p.y << "}, ";
+//   }
+//   bool equal = ship.boundary() == expectedBoundary;
+//   EXPECT_EQ(equal, true);
+// }
+
+// TEST(Transpose, TransposeSomethingSimple)
+// {
+//   vector<vector<int>> T = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
+//   auto &ref = T[1];
+//   ref[0] = 321;
+//   transposeField(T);
+
+//   EXPECT_EQ(T[0][1], 321);
+// }
+
+// TEST(SaenkeSlagSkib, TestTransposable)
+// {
+//   std::vector<std::vector<int>> map2 = {
+//       std::vector<int>{0, 1, 1, 1, 1, 0, 0, 0, 0, 0},
+//       std::vector<int>{1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//       std::vector<int>{1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//       std::vector<int>{1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//       std::vector<int>{1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//       std::vector<int>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//       std::vector<int>{0, 1, 0, 0, 0, 0, 0, 0, 0, 0},
+//       std::vector<int>{0, 1, 0, 0, 0, 0, 0, 0, 0, 0},
+//       std::vector<int>{0, 1, 0, 1, 1, 0, 0, 0, 0, 0},
+//       std::vector<int>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
+
+//   auto ships = findShips(map2);
+//   auto counts = countShipTypes(ships);
+
+//   EXPECT_EQ(counts[BattleShip], 2);
+//   EXPECT_EQ(counts[Cruiser], 1);
+//   EXPECT_EQ(counts[Destroyer], 1);
+// }
 
 // TEST(BattleShipClass, SanityConstructionCheck)
 // {
@@ -205,53 +361,35 @@ bool validate_battlefield(std::vector<std::vector<int>> field)
 
 //   EXPECT_EQ(validate_battlefield(map2), true);
 // }
-TEST(SaenkeSlagSkib, CorrectBoundaryPoints)
+
+// TEST(SaenkeSlagSkib, CodeWarsExample)
+// {
+//   battlefield field = {{1, 0, 0, 0, 0, 1, 1, 0, 0, 0},
+//                        {1, 0, 1, 0, 0, 0, 0, 0, 1, 0},
+//                        {1, 0, 1, 0, 1, 1, 1, 0, 1, 0},
+//                        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+//                        {0, 0, 0, 0, 0, 0, 0, 0, 1, 0},
+//                        {0, 0, 0, 0, 1, 1, 1, 0, 0, 0},
+//                        {0, 0, 0, 0, 0, 0, 0, 0, 1, 0},
+//                        {0, 0, 0, 1, 0, 0, 0, 0, 0, 0},
+//                        {0, 0, 0, 0, 0, 0, 0, 1, 0, 0},
+//                        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
+
+//   EXPECT_TRUE(validate_battlefield(field));
+// }
+
+TEST(SaenkeSlagSkib, CodeWarsExample2)
 {
-  set<Point> expectedBoundary = {{-1, -1}, {-1, 0}, {-1, 1}, {-1, 2}, {-1, 3}, {0, -1}, {0, 3}, {1, -1}, {1, 0}, {1, 1}, {1, 2}, {1, 3}};
+  battlefield field = {{1, 0, 0, 0, 0, 1, 1, 0, 0, 0},
+                       {1, 0, 1, 0, 0, 0, 0, 0, 1, 0},
+                       {1, 0, 1, 0, 1, 1, 1, 0, 1, 0},
+                       {1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 1, 0},
+                       {0, 0, 0, 0, 1, 1, 1, 0, 0, 0},
+                       {0, 0, 0, 1, 0, 0, 0, 0, 1, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 1, 0, 0},
+                       {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
 
-  Ship ship(Point{0, 0}, Cruiser, true);
-  set<Point> shipBoundary = ship.boundary();
-  for (auto p : expectedBoundary)
-  {
-    cout << "{" << p.x << ", " << p.y << "}, ";
-  }
-  cout << endl;
-  for (auto p : shipBoundary)
-  {
-    cout << "{" << p.x << ", " << p.y << "}, ";
-  }
-  bool equal = ship.boundary() == expectedBoundary;
-  EXPECT_EQ(equal, true);
-}
-
-TEST(Transpose, TransposeSomethingSimple)
-{
-  vector<vector<int>> T = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
-  auto &ref = T[1];
-  ref[0] = 321;
-  transposeField(T);
-
-  EXPECT_EQ(T[0][1], 321);
-}
-
-TEST(SaenkeSlagSkib, TestTransposable)
-{
-  std::vector<std::vector<int>> map2 = {
-      std::vector<int>{0, 1, 1, 1, 1, 0, 0, 0, 0, 0},
-      std::vector<int>{1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-      std::vector<int>{1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-      std::vector<int>{1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-      std::vector<int>{1, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-      std::vector<int>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-      std::vector<int>{0, 1, 0, 0, 0, 0, 0, 0, 0, 0},
-      std::vector<int>{0, 1, 0, 0, 0, 0, 0, 0, 0, 0},
-      std::vector<int>{0, 1, 0, 1, 1, 0, 0, 0, 0, 0},
-      std::vector<int>{0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
-
-  auto ships = findShips(map2);
-  auto counts = countShipTypes(ships);
-
-  EXPECT_EQ(counts[BattleShip], 2);
-  EXPECT_EQ(counts[Cruiser], 1);
-  EXPECT_EQ(counts[Destroyer], 1);
+  EXPECT_FALSE(validate_battlefield(field));
 }
