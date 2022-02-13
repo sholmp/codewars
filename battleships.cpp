@@ -1,9 +1,12 @@
+// Kata 'Battleship field validator : https://www.codewars.com/kata/52bb6539a4cf1b12d90005b7
+
 #include <iostream>
 #include <vector>
 #include <gtest/gtest.h>
 #include <inttypes.h>
 #include <algorithm>
 #include <map>
+#include <set>
 using namespace std;
 
 struct Point
@@ -18,6 +21,11 @@ struct Point
   bool operator==(const Point &rhs) const
   {
     return x == rhs.x && y == rhs.y;
+  }
+
+  bool operator<(const Point &rhs) const
+  {
+    return x < rhs.x || (x == rhs.x && y < rhs.y);
   }
 };
 
@@ -41,6 +49,25 @@ public:
     }
   }
   ShipType type() const { return type_; }
+
+  set<Point> boundary()
+  {
+    static vector<Point> unitDirections = {{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 0}, {0, 1}, {1, -1}, {1, 0}, {1, 1}};
+    set<Point> boundary;
+    for (const auto &p : points_)
+    {
+      for (const auto &d : unitDirections)
+      {
+        Point adjacent = p + d;
+        if (std::find(points_.begin(), points_.end(), adjacent) == points_.end()) // if the point is not part of the ship's core, then add it to the boundary
+        {
+          boundary.insert(adjacent);
+        }
+      }
+    }
+
+    return boundary;
+  }
 
   friend bool operator==(const Ship &ship, const vector<Point> &points)
   {
@@ -90,10 +117,10 @@ vector<Ship> findShips(vector<vector<int>> field)
     {
       for (int i = 0; i < field.size(); i++) // for every row
       {
-        // auto &field[i] = field[i];
+        auto &row = field[i];
         for (int j = 0; j <= width - shipType; j++)
         {
-          vector<int> mask(field[i].begin() + j, field[i].begin() + j + shipType);
+          vector<int> mask(row.begin() + j, row.begin() + j + shipType);
           if (mask == ship)
           {
             if (horizontal)
@@ -102,7 +129,7 @@ vector<Ship> findShips(vector<vector<int>> field)
               shipsFound.push_back(Ship(Point(j, i), shipType, horizontal)); // flip point coords if field has been transposed
 
             cout << "Found ship: " << shipsFound.back() << endl;
-            fill(field[i].begin() + j, field[i].begin() + j + shipType, 0); //  clear the elements in which we found a ship
+            fill(row.begin() + j, row.begin() + j + shipType, 0); //  clear the elements in which we found a ship
           }
         }
       }
@@ -130,8 +157,8 @@ bool validate_battlefield(std::vector<std::vector<int>> field)
   auto shipTypeCounts = countShipTypes(ships);
   bool correctNumberOfShipsFound = shipTypeCounts[BattleShip] == 1 && shipTypeCounts[Cruiser] == 2 && shipTypeCounts[Destroyer] == 3 && shipTypeCounts[Submarine] == 4;
 
-  if (correctNumberOfShipsFound)
-    ;
+  if (!correctNumberOfShipsFound)
+    return false;
 
   return true;
 }
@@ -178,14 +205,31 @@ bool validate_battlefield(std::vector<std::vector<int>> field)
 
 //   EXPECT_EQ(validate_battlefield(map2), true);
 // }
+TEST(SaenkeSlagSkib, CorrectBoundaryPoints)
+{
+  set<Point> expectedBoundary = {{-1, -1}, {-1, 0}, {-1, 1}, {-1, 2}, {-1, 3}, {0, -1}, {0, 3}, {1, -1}, {1, 0}, {1, 1}, {1, 2}, {1, 3}};
 
+  Ship ship(Point{0, 0}, Cruiser, true);
+  set<Point> shipBoundary = ship.boundary();
+  for (auto p : expectedBoundary)
+  {
+    cout << "{" << p.x << ", " << p.y << "}, ";
+  }
+  cout << endl;
+  for (auto p : shipBoundary)
+  {
+    cout << "{" << p.x << ", " << p.y << "}, ";
+  }
+  bool equal = ship.boundary() == expectedBoundary;
+  EXPECT_EQ(equal, true);
+}
 
 TEST(Transpose, TransposeSomethingSimple)
 {
-  vector<vector<int>> T = {{1,2,3}, {4,5,6}, {7,8,9}};
-  auto& ref = T[1];
+  vector<vector<int>> T = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
+  auto &ref = T[1];
   ref[0] = 321;
-  transposeField(T);  
+  transposeField(T);
 
   EXPECT_EQ(T[0][1], 321);
 }
